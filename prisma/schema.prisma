@@ -1,0 +1,360 @@
+// Spectra v1 — Prisma Schema
+// Master Plan v3.1 · March 7, 2026
+// 
+// 12 tables. Relationships enforce the data flow:
+//   Entry → MirrorAnalysis → Assumption (first-class, lifecycle-tracked)
+//   Entry → SparSession → SparTurn (per-turn engagement tracking)
+//   Entry → LensApplication (framework distribution)
+//   User → GraphNode → GraphEdge (knowledge graph)
+//   User → CognitiveProfile (computed rollup — the moat)
+//   User → Milestone (earned through real cognitive growth)
+//
+// Privacy: ADR-006 three-tier data architecture
+//   Tier 1 (Sacred): Entry.content, MirrorAnalysis text, SparTurn messages — encrypted, never used for training
+//   Tier 2 (Private): Assumptions, LensApplications, GraphNodes, CognitiveProfile — user-owned, exportable, deletable
+//   Tier 3 (Aggregate): Anonymized counts only — powers research + prompt improvement
+//
+// All queries MUST be scoped to userId (row-level security enforced at API layer)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── ENUMS ──────────────────────────────────────────────────────────────────
+
+enum InputMode {
+  text
+  voice
+}
+
+enum AssumptionStatus {
+  identified   // First surfaced by Mirror
+  examined     // User has engaged with it (via Spar or Lens)
+  revised      // User has explicitly revised their thinking
+  recurring    // Same assumption detected across multiple entries
+}
+
+enum EngagementType {
+  engage       // User directly addressed the challenge
+  deflect      // User sidestepped or redirected
+  concede      // User acknowledged the point
+}
+
+enum LensType {
+  socratic     // Sprint 3
+  inversion    // Sprint 4
+  steelman     // Sprint 4
+  firstprinciples // v2
+  systems      // v2
+}
+
+enum MilestoneType {
+  assumptions_examined    // "You've examined and revised 10 assumptions"
+  lens_diversity          // "You've applied all lens types to a single problem"
+  spar_resilience         // "Your Spar sessions averaged 5+ turns"
+  recurrence_drop         // "Your assumption recurrence rate dropped 35%"
+  entry_streak            // "You've written 3+ entries/week for a month"
+  first_mirror            // "Your first Mirror"
+  first_spar              // "Your first Spar"
+  custom                  // Future milestone types
+}
+
+// ─── USER ───────────────────────────────────────────────────────────────────
+// Auth handled by Clerk. This table stores Spectra-specific user data.
+// Clerk user ID is the primary key (string, not auto-increment).
+
+model User {
+  id        String   @id // Clerk user ID (e.g., "user_2abc123...")
+  email     String   @unique
+  name      String?
+  avatarUrl String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  entries          Entry[]
+  assumptions      Assumption[]
+  graphNodes       GraphNode[]
+  cognitiveProfile CognitiveProfile?
+  milestones       Milestone[]
+
+  @@map("users")
+}
+
+// ─── ENTRY ──────────────────────────────────────────────────────────────────
+// The core unit. What the user writes (or speaks).
+// Content is encrypted at rest (Tier 1 Sacred).
+// inputMode tracks whether entry was typed or spoken (analytics only — 
+// Cognitive Profile doesn't distinguish).
+
+model Entry {
+  id        String    @id @default(cuid())
+  userId    String
+  content   String    // Encrypted at rest. Tier 1 Sacred. Never used for training.
+  title     String?   // Auto-generated from first line, for list display
+  inputMode InputMode @default(text)
+  wordCount Int       @default(0)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  // pgvector embedding for similarity search (assumption recurrence detection)
+  // Stored as float array; actual pgvector column created via migration SQL
+  // embedding Float[] // Uncomment when pgvector extension is enabled
+
+  // Relations
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mirrorAnalysis   MirrorAnalysis?
+  sparSession      SparSession?
+  lensApplications LensApplication[]
+  assumptions      Assumption[]
+
+  @@index([userId])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("entries")
+}
+
+// ─── MIRROR ANALYSIS ────────────────────────────────────────────────────────
+// One-to-one with Entry. The structured decomposition of the user's thinking.
+// Frame: the lens/perspective the user is thinking inside.
+// AvoidedQuestion: the question they're not asking themselves.
+// Assumptions are stored as separate Assumption records (not JSON blobs).
+
+model MirrorAnalysis {
+  id              String   @id @default(cuid())
+  entryId         String   @unique
+  frame           String   // "Organizational identity crisis" — Tier 1 Sacred
+  avoidedQuestion String   // "What if the team doesn't believe?" — Tier 1 Sacred
+  promptVersion   String   // Links to PromptTemplate.id for A/B tracking
+  rawResponse     String?  // Full AI response for debugging (Tier 1 Sacred, auto-delete after 30 days)
+  createdAt       DateTime @default(now())
+
+  // Relations
+  entry       Entry        @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  assumptions Assumption[]
+
+  @@index([entryId])
+  @@map("mirror_analyses")
+}
+
+// ─── ASSUMPTION ─────────────────────────────────────────────────────────────
+// THE MOST IMPORTANT TABLE. First-class entity with lifecycle.
+// Each Mirror produces 2-3 assumptions. Each is stored individually.
+// Status lifecycle: identified → examined → revised → recurring
+// Cross-entry recurrence detected via pgvector similarity search.
+// This table is the foundation of the Cognitive Profile.
+
+model Assumption {
+  id              String           @id @default(cuid())
+  mirrorId        String
+  entryId         String
+  userId          String
+  text            String           // "The rebrand is the cause, not a symptom" — Tier 2 Private
+  domain          String?          // Auto-classified: "strategy", "pricing", "team", etc.
+  status          AssumptionStatus @default(identified)
+  occurrenceCount Int              @default(1)
+  firstSeenAt     DateTime         @default(now())
+  lastSeenAt      DateTime         @default(now())
+  linkedAssumptionId String?       // If recurring, links to the original assumption
+
+  // pgvector embedding for recurrence detection
+  // embedding Float[] // Uncomment when pgvector extension is enabled
+
+  // Relations
+  mirror           MirrorAnalysis @relation(fields: [mirrorId], references: [id], onDelete: Cascade)
+  entry            Entry          @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  linkedAssumption Assumption?    @relation("AssumptionRecurrence", fields: [linkedAssumptionId], references: [id])
+  recurrences      Assumption[]   @relation("AssumptionRecurrence")
+
+  @@index([userId])
+  @@index([userId, status])
+  @@index([userId, domain])
+  @@index([userId, lastSeenAt(sort: Desc)])
+  @@map("assumptions")
+}
+
+// ─── SPAR SESSION ───────────────────────────────────────────────────────────
+// One-to-one with Entry. The adversarial dialogue session.
+// 10-turn cap. "Pause" exit ramp delivers synthesis.
+// Individual turns stored in SparTurn (not as JSON array).
+
+model SparSession {
+  id            String   @id @default(cuid())
+  entryId       String   @unique
+  turnCount     Int      @default(0)
+  maxTurns      Int      @default(10)
+  promptVersion String   // Links to PromptTemplate.id
+  synthesis     String?  // AI synthesis when paused or completed — Tier 1 Sacred
+  completedAt   DateTime?
+  createdAt     DateTime @default(now())
+
+  // Relations
+  entry Entry      @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  turns SparTurn[]
+
+  @@index([entryId])
+  @@map("spar_sessions")
+}
+
+// ─── SPAR TURN ──────────────────────────────────────────────────────────────
+// Each exchange in the Spar. Stored individually for engagement tracking.
+// engagementType is AI-classified post-hoc (not self-tagged by user).
+// This feeds Challenge Resilience in the Cognitive Profile.
+
+model SparTurn {
+  id             String         @id @default(cuid())
+  sessionId      String
+  turnNumber     Int            // 1-indexed
+  challengeMsg   String         // AI's challenge — Tier 1 Sacred
+  userResponse   String         // User's response — Tier 1 Sacred
+  engagementType EngagementType? // AI-classified after response submitted
+  createdAt      DateTime       @default(now())
+
+  // Relations
+  session SparSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, turnNumber])
+  @@index([sessionId])
+  @@map("spar_turns")
+}
+
+// ─── LENS APPLICATION ───────────────────────────────────────────────────────
+// Each time a user applies a lens to an entry.
+// Feeds Framework Distribution in the Cognitive Profile.
+
+model LensApplication {
+  id        String   @id @default(cuid())
+  entryId   String
+  lensType  LensType
+  output    String   // Lens analysis output — Tier 1 Sacred
+  domain    String?  // Auto-classified domain of the entry
+  createdAt DateTime @default(now())
+
+  // Relations
+  entry Entry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  @@index([entryId])
+  @@map("lens_applications")
+}
+
+// ─── GRAPH NODE ─────────────────────────────────────────────────────────────
+// Concepts extracted from entries. Visualization via Sigma.js.
+// Sprint 5+ feature. Tables created in Sprint 1 (empty but ready).
+
+model GraphNode {
+  id        String   @id @default(cuid())
+  userId    String
+  concept   String   // "pricing strategy", "team dynamics" — Tier 2 Private
+  frequency Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // pgvector embedding for concept similarity
+  // embedding Float[] // Uncomment when pgvector extension is enabled
+
+  // Relations
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  edgesFrom GraphEdge[] @relation("EdgeSource")
+  edgesTo   GraphEdge[] @relation("EdgeTarget")
+
+  @@unique([userId, concept])
+  @@index([userId])
+  @@map("graph_nodes")
+}
+
+// ─── GRAPH EDGE ─────────────────────────────────────────────────────────────
+// Connections between concepts. Weight = co-occurrence strength.
+
+model GraphEdge {
+  id       String @id @default(cuid())
+  sourceId String
+  targetId String
+  weight   Int    @default(1) // Incremented on each co-occurrence
+  entryIds String[] // Array of entry IDs where these concepts co-occurred
+
+  // Relations
+  source GraphNode @relation("EdgeSource", fields: [sourceId], references: [id], onDelete: Cascade)
+  target GraphNode @relation("EdgeTarget", fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceId, targetId])
+  @@map("graph_edges")
+}
+
+// ─── COGNITIVE PROFILE ──────────────────────────────────────────────────────
+// THE MOAT. Computed rollup of all user activity.
+// One-to-one with User. Recomputed after each Mirror/Spar/Lens interaction.
+// JSON fields store structured data that changes shape as the product evolves.
+// Tier 2 Private — user-owned, exportable, deletable.
+
+model CognitiveProfile {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  lastComputed   DateTime @default(now())
+  
+  // Assumption metrics
+  totalAssumptions    Int   @default(0)
+  recurrenceRate      Float @default(0) // % of assumptions that recur
+  examinedRate        Float @default(0) // % of assumptions examined or revised
+  
+  // Spar metrics
+  avgSparTurns        Float @default(0) // Average turns before concession
+  avgEngagement       Float @default(0) // Engage vs deflect ratio
+  totalSparSessions   Int   @default(0)
+  
+  // Framework metrics
+  frameworkDist       Json  @default("{}") // { "socratic": 5, "inversion": 3, ... }
+  
+  // Advanced (Sprint 5+)
+  blindSpots          Json  @default("[]") // Domains discussed but never examined
+  developmentTrajectory Json @default("[]") // Time-series snapshots
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("cognitive_profiles")
+}
+
+// ─── MILESTONE ──────────────────────────────────────────────────────────────
+// Genuine cognitive development markers (Strava model, not Duolingo).
+// Earned through real growth, not engagement.
+
+model Milestone {
+  id         String        @id @default(cuid())
+  userId     String
+  type       MilestoneType
+  achievedAt DateTime      @default(now())
+  metadata   Json          @default("{}") // Type-specific data (e.g., { "from": 2, "to": 5 } for spar_resilience)
+  dismissed  Boolean       @default(false) // User can dismiss notification
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, achievedAt(sort: Desc)])
+  @@map("milestones")
+}
+
+// ─── PROMPT TEMPLATE ────────────────────────────────────────────────────────
+// ADR-005: Prompts versioned in DB, model-agnostic.
+// Hot-swap without redeploy. A/B testable. Portable across AI vendors.
+
+model PromptTemplate {
+  id           String   @id @default(cuid())
+  name         String   @unique // "mirror-v1", "spar-v2", "socratic-v1"
+  description  String?
+  systemPrompt String   // The actual prompt text
+  model        String   @default("claude-sonnet-4-20250514") // Model-agnostic: swap without code change
+  maxTokens    Int      @default(1024)
+  temperature  Float    @default(0.7)
+  isActive     Boolean  @default(true) // Only active prompts are used
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([name, isActive])
+  @@map("prompt_templates")
+}

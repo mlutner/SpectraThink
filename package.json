@@ -1,0 +1,24 @@
+{
+  "name": "spectra",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A gymnasium for the mind — cognitive development platform",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:web": "npm -w apps/web run dev",
+    "dev:api": "npm -w apps/api run dev",
+    "build:web": "npm -w apps/web run build",
+    "build:api": "npm -w apps/api run build",
+    "db:migrate": "npx prisma migrate dev",
+    "db:push": "npx prisma db push",
+    "db:studio": "npx prisma studio",
+    "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

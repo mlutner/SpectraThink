@@ -1,0 +1,96 @@
+/* Spectra Design Tokens
+ * Source of truth for all visual styling.
+ * See Design Spec v1 (Aria) for usage guidelines.
+ */
+
+:root {
+  /* ─── Surfaces ───────────────────────────── */
+  --bg: #0b0b10;
+  --surface: #0f0f16;
+  --surface2: #141420;
+  --surface3: #1a1a28;
+  --border: rgba(155, 147, 180, 0.06);
+  --border2: rgba(155, 147, 180, 0.10);
+
+  /* ─── Text ───────────────────────────────── */
+  --text: #8b879e;
+  --text-strong: #cbc7da;
+  --white: #eeeaf6;
+
+  /* ─── Brand ──────────────────────────────── */
+  --lavender: #9b93b4;
+  --amber: #c8a96e;
+  --violet: #a07ec8;
+  --blue: #6e9ec8;
+  --teal: #6ec8a9;
+  --rose: #c86e8b;
+  --gradient: linear-gradient(90deg, #c8a96e, #a07ec8, #6e9ec8);
+
+  /* ─── Status ─────────────────────────────── */
+  --red: #c86e6e;
+  --yellow: #c8b86e;
+  --green: #6ec87a;
+
+  /* ─── Typography ─────────────────────────── */
+  --font-body: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-headline: 'Playfair Display', Georgia, serif;
+  --font-mono: 'DM Mono', 'SF Mono', 'Fira Code', monospace;
+
+  /* ─── Spacing (base: 4px) ────────────────── */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 28px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-14: 56px;
+
+  /* ─── Radii ──────────────────────────────── */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
+
+  /* ─── Layout ─────────────────────────────── */
+  --sidebar-width-collapsed: 52px;
+  --sidebar-width-expanded: 220px;
+  --content-max-width: 680px;
+  --editor-text-max-width: 620px;
+  --panel-width: 360px;
+  --panel-min-width: 280px;
+  --panel-max-width: 480px;
+}
+
+/* ─── Global Resets ──────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── Noise Texture Overlay ──────────────────── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='b'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9 0.15' numOctaves='4' seed='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23b)' opacity='0.025'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 512px 512px;
+}
