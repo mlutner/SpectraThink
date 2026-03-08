@@ -1,0 +1,113 @@
+@import "tailwindcss";
+@import "./lib/spectra-tokens.css";
+
+/* ─── Tailwind v4 theme mapping ──────────────── */
+@theme {
+  --color-bg: #0b0b10;
+  --color-surface: #0f0f16;
+  --color-surface2: #141420;
+  --color-surface3: #1a1a28;
+  --color-text-muted: #8b879e;
+  --color-text-strong: #cbc7da;
+  --color-text-white: #eeeaf6;
+  --color-lavender: #9b93b4;
+  --color-amber: #c8a96e;
+  --color-violet: #a07ec8;
+  --color-blue: #6e9ec8;
+  --color-teal: #6ec8a9;
+  --color-rose: #c86e8b;
+}
+
+/* ─── Selection ───────────────────────────────── */
+::selection {
+  background: rgba(160, 126, 200, 0.25);
+  color: var(--white);
+}
+
+/* ─── Scrollbar ───────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(155, 147, 180, 0.15);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(155, 147, 180, 0.25);
+}
+
+/* ─── Focus ring ──────────────────────────────── */
+:focus-visible {
+  outline: 1px solid var(--lavender);
+  outline-offset: 2px;
+}
+
+/* ─── Tiptap Editor ───────────────────────────── */
+.tiptap {
+  outline: none;
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.85;
+  color: rgba(238, 234, 246, 0.9);
+  max-width: var(--editor-text-max-width);
+  caret-color: var(--lavender);
+}
+
+.tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: var(--text);
+  opacity: 0.3;
+  pointer-events: none;
+  height: 0;
+  font-style: italic;
+}
+
+.tiptap h1, .tiptap h2, .tiptap h3 {
+  color: var(--white);
+  font-weight: 600;
+}
+
+.tiptap h1 { font-size: 1.5em; margin: 1.5em 0 0.5em; }
+.tiptap h2 { font-size: 1.25em; margin: 1.25em 0 0.5em; }
+.tiptap h3 { font-size: 1.1em; margin: 1em 0 0.5em; }
+
+.tiptap p {
+  margin-bottom: 0.75em;
+}
+
+.tiptap strong {
+  color: var(--white);
+  font-weight: 600;
+}
+
+.tiptap em {
+  font-style: italic;
+}
+
+.tiptap blockquote {
+  border-left: 2px solid var(--border2);
+  padding-left: var(--space-4);
+  margin: 1em 0;
+  color: var(--text-strong);
+}
+
+.tiptap ul, .tiptap ol {
+  padding-left: 1.5em;
+  margin-bottom: 0.75em;
+}
+
+.tiptap code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  background: var(--surface2);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: var(--lavender);
+}
