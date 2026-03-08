@@ -4,8 +4,10 @@ import { motion } from "motion/react";
 import { useEntry } from "@/hooks/useEntries";
 import { useAutoSave } from "@/hooks/useAutoSave";
 import { useEditorStore } from "@/stores/editor-store";
+import { useMirrorStore } from "@/stores/mirror-store";
 import { EntryEditor } from "@/components/editor/EntryEditor";
 import { ActionBar } from "@/components/editor/ActionBar";
+import { MirrorPanel } from "@/components/mirror/MirrorPanel";
 import { loadDraft } from "@/lib/local-storage";
 import { revealSpring } from "@/lib/spectra-motion";
 
@@ -18,6 +20,7 @@ export function EditorPage() {
   const setDraftContent = useEditorStore((s) => s.setDraftContent);
   const setDirty = useEditorStore((s) => s.setDirty);
   const reset = useEditorStore((s) => s.reset);
+  const closePanel = useMirrorStore((s) => s.closePanel);
 
   // Set active entry and load draft
   useEffect(() => {
@@ -35,8 +38,9 @@ export function EditorPage() {
 
     return () => {
       reset();
+      closePanel();
     };
-  }, [id, setActiveEntry, setDraftContent, setDirty, reset]);
+  }, [id, setActiveEntry, setDraftContent, setDirty, reset, closePanel]);
 
   if (error) {
     navigate("/entries");
@@ -53,15 +57,21 @@ export function EditorPage() {
 
   return (
     <motion.div
-      className="flex h-full flex-col"
+      className="flex h-full"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={revealSpring}
     >
-      <ActionBar entryId={entry.id} onSave={save} isSaving={isSaving} />
-      <div className="flex-1 overflow-y-auto px-8 py-8">
-        <EntryEditor initialContent={entry.content} />
+      {/* Editor area */}
+      <div className="flex flex-1 flex-col">
+        <ActionBar entryId={entry.id} onSave={save} isSaving={isSaving} />
+        <div className="flex-1 overflow-y-auto px-8 py-8">
+          <EntryEditor initialContent={entry.content} />
+        </div>
       </div>
+
+      {/* Mirror panel (right side) */}
+      <MirrorPanel />
     </motion.div>
   );
 }

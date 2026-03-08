@@ -1,4 +1,10 @@
-import type { ApiResponse, Entry, EntryListItem } from "@spectra/shared";
+import type {
+  ApiResponse,
+  Entry,
+  EntryListItem,
+  MirrorAnalysis,
+  Assumption,
+} from "@spectra/shared";
 
 async function getAuthHeaders(): Promise<HeadersInit> {
   // Clerk injects auth via cookies in same-origin requests
@@ -51,4 +57,21 @@ export const entriesApi = {
 
   delete: (id: string) =>
     apiFetch<{ id: string }>(`/api/entries/${id}`, { method: "DELETE" }),
+};
+
+// ─── Mirror API ─────────────────────────────────────────────
+
+export type MirrorWithAssumptions = MirrorAnalysis & {
+  assumptions: Assumption[];
+};
+
+export const mirrorApi = {
+  get: (entryId: string) =>
+    apiFetch<MirrorWithAssumptions>(`/api/mirror/${entryId}`),
+
+  trigger: (entryId: string) =>
+    apiFetch<MirrorWithAssumptions>("/api/mirror/analyze", {
+      method: "POST",
+      body: JSON.stringify({ entryId }),
+    }),
 };

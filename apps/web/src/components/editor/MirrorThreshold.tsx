@@ -1,14 +1,43 @@
 import { motion, AnimatePresence } from "motion/react";
-import { Eye } from "lucide-react";
+import { Eye, Loader2 } from "lucide-react";
 import { useEditorStore } from "@/stores/editor-store";
+import { useMirrorStore } from "@/stores/mirror-store";
+import { useMirror, useTriggerMirror } from "@/hooks/useMirror";
 import { reactSpring } from "@/lib/spectra-motion";
 
 const MIRROR_THRESHOLD = 200;
 
 export function MirrorThreshold() {
   const charCount = useEditorStore((s) => s.charCount);
+  const activeEntryId = useEditorStore((s) => s.activeEntryId);
+  const openPanel = useMirrorStore((s) => s.openPanel);
+  const setAnalyzing = useMirrorStore((s) => s.setAnalyzing);
+
+  const { data: existingMirror } = useMirror(activeEntryId ?? undefined);
+  const triggerMirror = useTriggerMirror();
+
   const isReady = charCount >= MIRROR_THRESHOLD;
+  const hasMirror = !!existingMirror;
   const progress = Math.min(charCount / MIRROR_THRESHOLD, 1);
+
+  async function handleClick() {
+    if (!activeEntryId) return;
+
+    if (hasMirror) {
+      // Already analyzed — just open the panel
+      openPanel();
+      return;
+    }
+
+    // Trigger new analysis
+    setAnalyzing(true);
+    openPanel();
+    try {
+      await triggerMirror.mutateAsync(activeEntryId);
+    } finally {
+      setAnalyzing(false);
+    }
+  }
 
   return (
     <div className="flex items-center gap-3">
@@ -37,15 +66,19 @@ export function MirrorThreshold() {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.9 }}
             transition={reactSpring}
-            className="relative flex items-center gap-1.5 overflow-hidden rounded-[var(--radius-md)] border border-[var(--border2)] bg-[var(--surface2)] px-3 py-1.5 text-sm text-[var(--violet)] hover:bg-[var(--surface3)]"
+            onClick={handleClick}
+            disabled={triggerMirror.isPending}
+            className="relative flex items-center gap-1.5 overflow-hidden rounded-[var(--radius-md)] border border-[var(--border2)] bg-[var(--surface2)] px-3 py-1.5 text-sm text-[var(--violet)] hover:bg-[var(--surface3)] disabled:opacity-60"
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.97 }}
-            disabled
-            title="Mirror analysis — coming in Sprint 2"
           >
-            <Eye size={14} strokeWidth={1.5} />
+            {triggerMirror.isPending ? (
+              <Loader2 size={14} strokeWidth={1.5} className="animate-spin" />
+            ) : (
+              <Eye size={14} strokeWidth={1.5} />
+            )}
             <span className="relative z-10 bg-gradient-to-r from-[var(--amber)] via-[var(--violet)] to-[var(--blue)] bg-clip-text font-medium text-transparent">
-              Mirror
+              {hasMirror ? "View Mirror" : "Mirror"}
             </span>
           </motion.button>
         )}

@@ -4,6 +4,8 @@ import helmet from "helmet";
 import { clerkMiddleware } from "@clerk/express";
 import { entryRoutes } from "./routes/entries.js";
 import { authRoutes } from "./routes/auth.js";
+import { mirrorRoutes } from "./routes/mirror.js";
+import { promptRoutes } from "./routes/prompts.js";
 import { errorHandler } from "./middleware/error-handler.js";
 
 const app = express();
@@ -18,6 +20,8 @@ app.use(clerkMiddleware());
 // ─── Routes ─────────────────────────────────────────────────
 app.use("/api/auth", authRoutes);
 app.use("/api/entries", entryRoutes);
+app.use("/api/mirror", mirrorRoutes);
+app.use("/api/prompts", promptRoutes);
 
 // ─── Health check ───────────────────────────────────────────
 app.get("/api/health", (_req, res) => {
